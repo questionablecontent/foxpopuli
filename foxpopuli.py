@@ -1,6 +1,6 @@
 from time import sleep
 from scapy.all import *
-import sys, threading, pygame, json, traceback
+import sys, threading, pygame, json, traceback, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs
 
@@ -122,22 +122,51 @@ class MyServer(BaseHTTPRequestHandler):
 	def do_GET(self):
 		print("Requested path: {}".format(self.path))
 		dct_params = parse_qs(self.path[2:])
+		response = {}
 		action = dct_params.get('action',None)
-		if action[0] == 'hunt':
-			ssid = dct_params.get('ssid',None)
-			if ssid[0]:
-				ssid = ssid[0]
-				hunt(ssid)
-				print("Started hunting for SSID {}...".format(ssid))
-				response = {'status':'SUCCESS', 'msg':'Successfullystarted hunting SSID {}'.format(ssid)}
+		if self.path == '/':
+			with open('index.html','r') as f:
+				data = f.read()
+			print("[+] sending index.html ({} bytes)...".format(len(data)))
+			self.wfile.write(bytes(data, 'utf=8'))
+		elif self.path == '/css/w3mobile.css':
+			with open('css/w3mobile.css','r') as f:
+				data = f.read()
+			print("[+] sending css/w3mobile.css ({} bytes)...".format(len(data)))
+			self.wfile.write(bytes(data, 'utf=8'))
+		elif self.path == '/js/jquery.js':
+			with open('js/jquery.js','r') as f:
+				data = f.read()
+			print("[+] sending js/jquery.js ({} bytes)...".format(len(data)))
+			self.wfile.write(bytes(data, 'utf=8'))
+		elif self.path == '/js/foxpopuli.js':
+			with open('js/foxpopuli.js','r') as f:
+				data = f.read()
+			print("[+] sending js/foxpopuli.js ({} bytes)...".format(len(data)))
+			self.wfile.write(bytes(data, 'utf=8'))
+		elif self.path == '/favicon.ico':
+			with open('favicon.ico','rb') as f:
+				data = f.read()
+			print("[+] sending favicon.ico ({} bytes)...".format(len(data)))
+			self.wfile.write(bytes(data))
+		elif action:
+			if action[0] == 'hunt':
+				ssid = dct_params.get('ssid',None)
+				if ssid[0]:
+					ssid = ssid[0]
+					hunt(ssid)
+					print("Started hunting for SSID {}...".format(ssid))
+					response = {'status':'SUCCESS', 'msg':'Successfully started hunting SSID {}'.format(ssid)}
+				else:
+					response = {'status':'FAIL', 'msg':'Unable start the hunt for SSID {}'.format(ssid)}
+			elif action[0] == 'test':
+				now = datetime.datetime.now() 
+				response = {'status':'SUCCESS', 'msg':'Successful test', 'data': "The time is now {}".format(now)}
 			else:
-				response = {'status':'FAIL', 'msg':'Unable start the hunt for SSID {}'.format(ssid)}
-		else:
-			response = {'status':'FAIL', 'msg':'{} is an unsupported action'.format(action)}
+				response = {'status':'FAIL', 'msg':'{} is an unsupported action'.format(action)}
 		
-		response = json.dumps(response)
-		
-		self.wfile.write(bytes(response, 'utf-8'))
+			response = json.dumps(response)
+			self.wfile.write(bytes(response, 'utf-8'))
 
 def hunt(ssid):
 	global tgt_ssid
@@ -178,4 +207,4 @@ if __name__ == '__main__':
 	myserver.server_close()
 	print("Stopped serving.")
 	
-	print('[+] done.')
+	print('[+] done..')
