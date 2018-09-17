@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs
 
 #Globals
+gblSSID = {}
 gbl_targets = {}
 tgt_ssid = None
 FSPL = 27.55 #Free-space path loss adapted average constant for home wifi routers
@@ -26,6 +27,31 @@ class scanThread(threading.Thread):
 			print("scanThread ERROR")
 			print(e)
 			pass
+# Scan for all available APs
+class scanapThread(threading.Thread):
+	global gblSSID
+	def __init__(self, iface):
+		threading.Thread.__init__(self)
+		self.iface = iface
+	
+	def run(self):
+		try:
+			gblSSID = {}
+			sniff(iface=self.iface, prn = APScanHandler, store=0, timeout=3)
+		except Exception as e:
+			print("scanap ERROR")
+			print(e)
+			pass
+
+def APScanHandler(pkt):
+	global gblSSID
+	if pkt.haslayer(Dot11):
+		if pkt.addr2 is not None:
+			if pkt.type == 0 and pkt.subtype == 8:
+				mac = pkt.addr2
+				ssid = (pkt.info).decode('ascii')
+				if mac not in gblSSID.keys():
+					gblSSID[mac] = {'ssid': ssid}
 
 class beepThread(threading.Thread):
 	global gbl_targets
@@ -110,9 +136,6 @@ def dbm2m(mhz, dbm):
 	m=round(m,2)
 	return m #Distance in meters
 
-def enumaps():
-	return [{'essid':'blah', 'bssid':'a1:b2:c3:d4:e5:f6', 'ch':1, 'enc':'yes'}]
-
 class MyServer(BaseHTTPRequestHandler):
 	def do_HEAD(self):
 		self.send_response(200)
@@ -120,34 +143,43 @@ class MyServer(BaseHTTPRequestHandler):
 		self.end_headers()
 		
 	def do_GET(self):
+		reqPath = self.path
 		print("Requested path: {}".format(self.path))
-		dct_params = parse_qs(self.path[2:])
+		
+		dct_params = parse_qs(reqPath[2:])
 		response = {}
 		action = dct_params.get('action',None)
-		if self.path == '/':
+		if reqPath == '/':
 			with open('index.html','r') as f:
 				data = f.read()
 			print("[+] sending index.html ({} bytes)...".format(len(data)))
 			self.wfile.write(bytes(data, 'utf=8'))
-		elif self.path == '/css/w3mobile.css':
-			with open('css/w3mobile.css','r') as f:
-				data = f.read()
-			print("[+] sending css/w3mobile.css ({} bytes)...".format(len(data)))
-			self.wfile.write(bytes(data, 'utf=8'))
-		elif self.path == '/js/jquery.js':
-			with open('js/jquery.js','r') as f:
-				data = f.read()
-			print("[+] sending js/jquery.js ({} bytes)...".format(len(data)))
-			self.wfile.write(bytes(data, 'utf=8'))
-		elif self.path == '/js/foxpopuli.js':
-			with open('js/foxpopuli.js','r') as f:
-				data = f.read()
-			print("[+] sending js/foxpopuli.js ({} bytes)...".format(len(data)))
-			self.wfile.write(bytes(data, 'utf=8'))
-		elif self.path == '/favicon.ico':
+		# If css or js, send all files available under the css or js sub directories
+		elif reqPath.startswith("/css/") or reqPath.startswith("/js/"):
+			tok = reqPath[1:].split("/")
+			if tok[0] == 'css':
+				fname = 'css/' + '/'.join(tok[1:])
+				with open(fname,'r') as f:
+					data = f.read()
+				print("[+] sending /css/{} ({} bytes)...".format(tok[1], len(data)))
+				self.wfile.write(bytes(data, 'utf=8'))
+			elif tok[0] == 'js':
+				fname = 'js/' + "/".join(tok[1:])
+				# Check if image file
+				if fname.endswith('.png') or fname.endswith('.gif'):
+					with open(fname,'rb') as f:
+						data = f.read()
+					print("[+] sending {} ({} bytes)...".format(fname, len(data)))
+					self.wfile.write(bytes(data))
+				else:
+					with open(fname,'r') as f:
+						data = f.read()
+					print("[+] sending {} ({} bytes)...".format(fname, len(data)))
+					self.wfile.write(bytes(data, 'utf=8'))
+		elif reqPath == '/favicon.ico':
 			with open('favicon.ico','rb') as f:
 				data = f.read()
-			print("[+] sending favicon.ico ({} bytes)...".format(len(data)))
+			print("[+] sending /favicon.ico ({} bytes)...".format(len(data)))
 			self.wfile.write(bytes(data))
 		elif action:
 			if action[0] == 'hunt':
@@ -159,14 +191,25 @@ class MyServer(BaseHTTPRequestHandler):
 					response = {'status':'SUCCESS', 'msg':'Successfully started hunting SSID {}'.format(ssid)}
 				else:
 					response = {'status':'FAIL', 'msg':'Unable start the hunt for SSID {}'.format(ssid)}
-			elif action[0] == 'test':
-				now = datetime.datetime.now() 
-				response = {'status':'SUCCESS', 'msg':'Successful test', 'data': "The time is now {}".format(now)}
+			elif action[0] == 'scanap':
+				res = scanap()
+				if res:
+					response = {'status':'SUCCESS', 'msg':'AP Scan successful', 'data': res}
+				else:
+					response = {'status':'FAIL', 'msg':'Error when scanning for APs.'}
 			else:
 				response = {'status':'FAIL', 'msg':'{} is an unsupported action'.format(action)}
 		
 			response = json.dumps(response)
 			self.wfile.write(bytes(response, 'utf-8'))
+
+def scanap():
+	iface = 'mon0'
+	thScan = scanapThread(iface)
+	thScan.start()
+	thScan.join()
+	return gblSSID
+
 
 def hunt(ssid):
 	global tgt_ssid
