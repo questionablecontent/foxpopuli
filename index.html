@@ -3,10 +3,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="css/w3mobile.css">
 <link rel="stylesheet" href="js/jquery-ui.theme.min.css">
-<style>
-	#aplist .ui-selecting { background: #FECA40; }
-  	#aplist .ui-selected { background: #F39814; color: white; }
-</style>
+<link rel="stylesheet" href="css/foxpopuli.css">
 <script type="text/javascript" src="js/jquery.js"></script>
 <script type="text/javascript" src="js/jquery-ui.min.js"></script>
 <script type="text/javascript" src="js/foxpopuli.js"></script>
@@ -20,13 +17,14 @@
   		<h3>Scan</h3>
   		<div>
     		<button id="scanap" class="ui-button ui-widget ui-corner-all">Scan</button>&nbsp;<span id='scanap_load'><img src='js/images/loader.gif'></span><br/>
-    		<ol id='aplist'>
-    		</ol>
+    		<table id='tbl_aplist'>
+          
+        </table>
   		</div>
   		<h3>Track</h3>
   		<div>
-    		MAC: <input type="text" name="mac"><br/>&nbsp;or&nbsp;<br/>
-    		SSID: <input type="text" name="ssid">&nbsp;<button id="trackap" class="ui-button ui-widget ui-corner-all">Track</button>
+    		MAC: <input type="text" id="txt_track_mac"><br/>&nbsp;or&nbsp;<br/>
+    		SSID: <input type="text" id="txt_track_ssid">&nbsp;<button id="trackap" class="ui-button ui-widget ui-corner-all">Track</button>
   		</div>
   	</div>
 </body>
