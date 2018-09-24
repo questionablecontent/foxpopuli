@@ -14,17 +14,16 @@
 	</textarea-->
 
 	<div id="accordion">
-  		<h3>Scan</h3>
+      <h3>Scan</h3>
   		<div>
-    		<button id="scanap" class="ui-button ui-widget ui-corner-all">Scan</button>&nbsp;<span id='scanap_load'><img src='js/images/loader.gif'></span><br/>
+    		<button id="scanap" class="ui-button ui-widget ui-corner-all">Scan</button>&nbsp;<span id='scanap_load'><img src='js/images/loader.gif'></span>&nbsp;<span id='scanap_load_msg'></span><br/>
     		<table id='tbl_aplist'>
-          
         </table>
   		</div>
   		<h3>Track</h3>
   		<div>
-    		MAC: <input type="text" id="txt_track_mac"><br/>&nbsp;or&nbsp;<br/>
-    		SSID: <input type="text" id="txt_track_ssid">&nbsp;<button id="trackap" class="ui-button ui-widget ui-corner-all">Track</button>
+    		MAC: <input type="text" id="txt_track_mac">&nbsp;or&nbsp;SSID: <input type="text" id="txt_track_ssid">&nbsp;<button id="cleartrackap" class="ui-button ui-widget ui-corner-all">Clear</button><br/>
+        <button id="trackap" class="ui-button ui-widget ui-corner-all">Track</button>&nbsp;<button id="stoptrackap" class="ui-button ui-widget ui-corner-all">Stops</button>
   		</div>
   	</div>
 </body>

@@ -21,13 +21,19 @@ $( document ).ready(function() {
 
     //Elements
     var $btnscanap_load = $("#scanap_load").hide();
+    var $span_scanap_load_msg = $("#scanap_load_msg");
     var $tbl_aplist = $("#tbl_aplist");
 
 
 
     //Button click handlers
+    $("#stoptrackap").prop("disabled",true);
+
     $( "#scanap" ).click( function( event ) {
+    	$("#scanap").prop("disabled",true);
     	$btnscanap_load.show();
+    	$span_scanap_load_msg.text("scanning...");
+    	$span_scanap_load_msg.show();
     	var jqxhr = $.get( "/", { action: "scanap"})
 		  .done(function(data) {
 		  	// Clear tbl_aplist, add headers
@@ -48,12 +54,15 @@ $( document ).ready(function() {
     			newrow = $("<tr><td>"+btn_details+"</td><td>"+btn_send+"</td><td>" + mac + "</td><td>" + data[mac].ssid + "</td></tr>");
 				newrow.appendTo($tbl_aplist);
 			});
+			var apcount = macs.length;
+			$span_scanap_load_msg.text("found " + apcount + " APs");
 		  })
 		  .fail(function(data) {
 		    alert( "Error when scanning for APs" );
 		  })
 		  .always(function() {
 		  	$btnscanap_load.hide();
+		  	$("#scanap").prop("disabled",false);
 		  })
 	});
 
@@ -66,6 +75,43 @@ $( document ).ready(function() {
 		$('#txt_track_ssid').val(ssid);
 
 		$('#accordion').accordion('option','active',1);
+	});
+
+
+	$( "#cleartrackap" ).click( function(event) {
+		$('#txt_track_mac').val("");
+		$('#txt_track_ssid').val("");
+	});
+
+
+	$( "#trackap" ).click( function( event ) {
+		$("#trackap").prop("disabled",true);
+		$("#stoptrackap").prop("disabled",false);
+		var ssid = $('#txt_track_ssid').val();
+		var mac = $('#txt_track_mac').val();
+		var jqxhr = $.get( "/", { action: "hunt", mac: mac, ssid: ssid})
+		  .done(function(data) {
+		  	alert("hunting");
+		  })
+		  .fail(function(data) {
+		    alert( "Error when hunting for AP" );
+		  })
+		  .always(function() {
+		  	$("#trackap").prop("disabled",false);
+		  })
+	});
+
+	$( "#stoptrackap" ).click( function( event ) {
+		var jqxhr = $.get( "/", { action: "stophunt"})
+		  .done(function(data) {
+		  	alert("stopped")
+		  })
+		  .fail(function(data) {
+		    alert( "Error when stopping the hunt for AP" );
+		  })
+		  .always(function() {
+		  	$("#trackap").prop("disabled",false);
+		  })
 	});
 
 });

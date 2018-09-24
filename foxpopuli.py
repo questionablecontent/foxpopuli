@@ -8,21 +8,22 @@ from urllib.parse import parse_qs
 gblSSID = {}
 gbl_targets = {}
 tgt_ssid = None
+flg_hunt = False
 FSPL = 27.55 #Free-space path loss adapted average constant for home wifi routers
 
 LISTENPORT = 80
 
 class scanThread(threading.Thread):
-	global gbl_targets
+	global gbl_targets, flg_hunt
 	def __init__(self, iface, ssid):
 		threading.Thread.__init__(self)
 		self.targets = gbl_targets
 		self.ssid = ssid
 		self.iface = iface
-	
+
 	def run(self):
 		try:
-			sniff(iface=self.iface, prn = PacketHandler)
+			sniff(iface=self.iface, prn = PacketHandler, store=0)
 		except Exception as e:
 			print("scanThread ERROR")
 			print(e)
@@ -54,7 +55,7 @@ def APScanHandler(pkt):
 					gblSSID[mac] = {'ssid': ssid}
 
 class beepThread(threading.Thread):
-	global gbl_targets
+	global gbl_targets, flg_hunt
 	def __init__(self, ssid):
 		threading.Thread.__init__(self)
 		pygame.mixer.init()
@@ -63,7 +64,7 @@ class beepThread(threading.Thread):
 		self.ssid = ssid
 		
 	def run(self):
-		while True:
+		while flg_hunt:
 			#threadLock.acquire()
 			print("Beeping...{}s,".format(self.sleepsec))
 			try:
@@ -112,7 +113,10 @@ class beepThread(threading.Thread):
 			sleep(self.sleepsec)
 
 def PacketHandler(pkt):
-	global gbl_targets, tgt_ssid
+	global gbl_targets, tgt_ssid, flg_hunt
+	if flg_hunt is True:
+		raise KeyboardInterrupt
+	
 	if pkt.haslayer(Dot11):
 		if pkt.addr2 is not None:
 			if pkt.type == 0 and pkt.subtype == 8:
@@ -127,7 +131,7 @@ def PacketHandler(pkt):
 					else:
 						sigstr = None 
 						print("No signal strength found!")
-						
+					#prev_lastseen = gbl_targets.get(tgt_ssid,-99)
 					gbl_targets[tgt_ssid] = {'signal': sigstr, 'lastseen': time.time()}
 					print("WiFi signal strength: {}".format(sigstr))
 
@@ -143,6 +147,7 @@ class MyServer(BaseHTTPRequestHandler):
 		self.end_headers()
 		
 	def do_GET(self):
+		global flg_hunt
 		reqPath = self.path
 		print("Requested path: {}".format(self.path))
 		
@@ -184,13 +189,25 @@ class MyServer(BaseHTTPRequestHandler):
 		elif action:
 			if action[0] == 'hunt':
 				ssid = dct_params.get('ssid',None)
-				if ssid[0]:
+				mac = dct_params.get('mac',None)
+				if ssid:
 					ssid = ssid[0]
-					hunt(ssid)
+				if mac:
+					mac = mac[0]
+				if ssid or mac:		
+					hunt(ssid, mac)
+					flg_hunt = True
 					print("Started hunting for SSID {}...".format(ssid))
 					response = {'status':'SUCCESS', 'msg':'Successfully started hunting SSID {}'.format(ssid)}
 				else:
 					response = {'status':'FAIL', 'msg':'Unable start the hunt for SSID {}'.format(ssid)}
+			elif action[0] == 'stophunt':
+				print("STOPHUNT received")
+				if flg_hunt is True:
+					flg_hunt = False
+					print("Hunt flag set to FALSE")
+				else:
+					print("Hunt flag was already FALSE")
 			elif action[0] == 'scanap':
 				res = scanap()
 				if res:
@@ -211,7 +228,7 @@ def scanap():
 	return gblSSID
 
 
-def hunt(ssid):
+def hunt(ssid=None, mac=None):
 	global tgt_ssid
 	tgt_ssid = ssid
 	iface = 'mon0'
@@ -221,8 +238,8 @@ def hunt(ssid):
 	thScan.start()
 	thBeep.start()
 	
-	thScan.join()
-	thBeep.join()
+	#thScan.join()
+	#thBeep.join()
 		
 if __name__ == '__main__':
 	'''iface = sys.argv[1]
