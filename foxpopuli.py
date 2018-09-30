@@ -3,17 +3,59 @@ from scapy.all import *
 import sys, threading, pygame, json, traceback, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs
+from multiprocessing import Process
+from math import log10
 
 #Globals
-gblSSID = {}
+gbl_scanned_SSIDs = {}
 gbl_targets = {}
 tgt_ssid = None
-flg_hunt = False
+proc_hunt = None
 FSPL = 27.55 #Free-space path loss adapted average constant for home wifi routers
 
 LISTENPORT = 80
 
-class scanThread(threading.Thread):
+class PacketSniffer(Process):
+	def __init__(self, iface, ssid):
+		super(PacketSniffer, self).__init__()
+		print("PacketSniffer init")
+		self.iface = iface
+		self.ssid = ssid
+
+	def run(self):
+		print("PacketSniffer run")
+		try:
+			sniff(iface=self.iface, prn = self.PacketHandler, store=0)
+		except Exception as e:
+			print("scanThread ERROR")
+			traceback.print_exc(file=sys.stdout)
+			pass
+		
+	def PacketHandler(self, pkt):
+		global gbl_targets
+
+		if pkt.haslayer(Dot11):
+			#print("PacketHandler: Packet received...")
+			if pkt.addr2 is not None:
+				if pkt.type == 0 and pkt.subtype == 8:
+					#print("pkt:{} | stored:{}".format((pkt.info).decode('ascii'), self.ssid))
+					if (pkt.info).decode('ascii') == self.ssid:
+						try:
+							extra = pkt.notdecoded
+						except:
+							extra = None
+						
+						if extra != None:
+							sigstr = -(256-ord(extra[-2:-1]))
+						else:
+							sigstr = None 
+							print("No signal strength found!")
+						#prev_lastseen = gbl_targets.get(tgt_ssid,-99)
+						gbl_targets[self.ssid] = {'signal': sigstr, 'lastseen': time.time()}
+						print("WiFi signal strength: {}dBm | Distance: {}m".format(sigstr, dbm2m(2400,abs(sigstr))))
+
+
+'''class scanThread(threading.Thread):
 	global gbl_targets, flg_hunt
 	def __init__(self, iface, ssid):
 		threading.Thread.__init__(self)
@@ -27,17 +69,18 @@ class scanThread(threading.Thread):
 		except Exception as e:
 			print("scanThread ERROR")
 			print(e)
-			pass
+			pass'''
+
 # Scan for all available APs
 class scanapThread(threading.Thread):
-	global gblSSID
+	global gbl_scanned_SSIDs
 	def __init__(self, iface):
 		threading.Thread.__init__(self)
 		self.iface = iface
 	
 	def run(self):
 		try:
-			gblSSID = {}
+			gbl_scanned_SSIDs = {}
 			sniff(iface=self.iface, prn = APScanHandler, store=0, timeout=3)
 		except Exception as e:
 			print("scanap ERROR")
@@ -45,16 +88,16 @@ class scanapThread(threading.Thread):
 			pass
 
 def APScanHandler(pkt):
-	global gblSSID
+	global gbl_scanned_SSIDs
 	if pkt.haslayer(Dot11):
 		if pkt.addr2 is not None:
 			if pkt.type == 0 and pkt.subtype == 8:
 				mac = pkt.addr2
 				ssid = (pkt.info).decode('ascii')
-				if mac not in gblSSID.keys():
-					gblSSID[mac] = {'ssid': ssid}
+				if mac not in gbl_scanned_SSIDs.keys():
+					gbl_scanned_SSIDs[mac] = {'ssid': ssid}
 
-class beepThread(threading.Thread):
+'''class beepThread(threading.Thread):
 	global gbl_targets, flg_hunt
 	def __init__(self, ssid):
 		threading.Thread.__init__(self)
@@ -110,14 +153,15 @@ class beepThread(threading.Thread):
 				print("beepThread ERROR")
 				traceback.print_exc(file=sys.stdout)
 				pass
-			sleep(self.sleepsec)
+			sleep(self.sleepsec)'''
 
-def PacketHandler(pkt):
+'''def PacketHandler(pkt):
 	global gbl_targets, tgt_ssid, flg_hunt
 	if flg_hunt is True:
 		raise KeyboardInterrupt
 	
 	if pkt.haslayer(Dot11):
+		print("PacketHandler: Packet received...")
 		if pkt.addr2 is not None:
 			if pkt.type == 0 and pkt.subtype == 8:
 				if (pkt.info).decode('ascii') == tgt_ssid:
@@ -133,7 +177,7 @@ def PacketHandler(pkt):
 						print("No signal strength found!")
 					#prev_lastseen = gbl_targets.get(tgt_ssid,-99)
 					gbl_targets[tgt_ssid] = {'signal': sigstr, 'lastseen': time.time()}
-					print("WiFi signal strength: {}".format(sigstr))
+					print("WiFi signal strength: {}".format(sigstr))'''
 
 def dbm2m(mhz, dbm):
 	m = 10 ** (( FSPL - (20 * log10(mhz)) + dbm ) / 20)
@@ -147,7 +191,7 @@ class MyServer(BaseHTTPRequestHandler):
 		self.end_headers()
 		
 	def do_GET(self):
-		global flg_hunt
+		global proc_hunt
 		reqPath = self.path
 		print("Requested path: {}".format(self.path))
 		
@@ -203,11 +247,12 @@ class MyServer(BaseHTTPRequestHandler):
 					response = {'status':'FAIL', 'msg':'Unable start the hunt for SSID {}'.format(ssid)}
 			elif action[0] == 'stophunt':
 				print("STOPHUNT received")
-				if flg_hunt is True:
-					flg_hunt = False
-					print("Hunt flag set to FALSE")
+				if proc_hunt != None:
+					proc_hunt.terminate()
+					print("Terminated hunt process")
+					proc_hunt = None
 				else:
-					print("Hunt flag was already FALSE")
+					print("Process was not hunting. Unable to terminate.")
 			elif action[0] == 'scanap':
 				res = scanap()
 				if res:
@@ -225,36 +270,18 @@ def scanap():
 	thScan = scanapThread(iface)
 	thScan.start()
 	thScan.join()
-	return gblSSID
+	return gbl_scanned_SSIDs
 
 
 def hunt(ssid=None, mac=None):
-	global tgt_ssid
+	global tgt_ssid, proc_hunt
 	tgt_ssid = ssid
 	iface = 'mon0'
-	thScan = scanThread(iface, tgt_ssid)
-	thBeep = beepThread(tgt_ssid)
-	
-	thScan.start()
-	thBeep.start()
-	
-	#thScan.join()
-	#thBeep.join()
-		
+	proc_hunt = PacketSniffer(iface, ssid)
+	proc_hunt.daemon = True
+	proc_hunt.start()
+
 if __name__ == '__main__':
-	'''iface = sys.argv[1]
-	tgt_ssid = sys.argv[2]
-	
-	
-	threadLock = threading.Lock()
-	thScan = scanThread(iface, tgt_ssid)
-	thBeep = beepThread(tgt_ssid)
-	
-	thScan.start()
-	thBeep.start()
-	
-	thScan.join()
-	thBeep.join()'''
 	
 	myserver = HTTPServer(("", LISTENPORT), MyServer)
 	print("Serving at port {}...".format(LISTENPORT))
