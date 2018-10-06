@@ -3,24 +3,27 @@ from scapy.all import *
 import sys, threading, pygame, json, traceback, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs
-from multiprocessing import Process
+from multiprocessing import Process, Manager
 from math import log10
 
 #Globals
+gbl_manager = Manager()
 gbl_scanned_SSIDs = {}
-gbl_targets = {}
+gbl_targets = gbl_manager.dict() # TODO: Pick up here. Share this dict across processes
 tgt_ssid = None
 proc_hunt = None
+proc_beep = None
 FSPL = 27.55 #Free-space path loss adapted average constant for home wifi routers
 
 LISTENPORT = 80
 
 class PacketSniffer(Process):
-	def __init__(self, iface, ssid):
+	def __init__(self, iface, ssid, gbl_targets):
 		super(PacketSniffer, self).__init__()
 		print("PacketSniffer init")
 		self.iface = iface
 		self.ssid = ssid
+		self.gbl_targets = gbl_targets
 
 	def run(self):
 		print("PacketSniffer run")
@@ -32,7 +35,6 @@ class PacketSniffer(Process):
 			pass
 		
 	def PacketHandler(self, pkt):
-		global gbl_targets
 
 		if pkt.haslayer(Dot11):
 			#print("PacketHandler: Packet received...")
@@ -51,28 +53,11 @@ class PacketSniffer(Process):
 							sigstr = None 
 							print("No signal strength found!")
 						#prev_lastseen = gbl_targets.get(tgt_ssid,-99)
-						gbl_targets[self.ssid] = {'signal': sigstr, 'lastseen': time.time()}
+						self.gbl_targets[self.ssid] = {'signal': sigstr, 'lastseen': time.time()}
 						print("WiFi signal strength: {}dBm | Distance: {}m".format(sigstr, dbm2m(2400,abs(sigstr))))
 
-
-'''class scanThread(threading.Thread):
-	global gbl_targets, flg_hunt
-	def __init__(self, iface, ssid):
-		threading.Thread.__init__(self)
-		self.targets = gbl_targets
-		self.ssid = ssid
-		self.iface = iface
-
-	def run(self):
-		try:
-			sniff(iface=self.iface, prn = PacketHandler, store=0)
-		except Exception as e:
-			print("scanThread ERROR")
-			print(e)
-			pass'''
-
 # Scan for all available APs
-class scanapThread(threading.Thread):
+class ScanAPThread(threading.Thread):
 	global gbl_scanned_SSIDs
 	def __init__(self, iface):
 		threading.Thread.__init__(self)
@@ -81,39 +66,41 @@ class scanapThread(threading.Thread):
 	def run(self):
 		try:
 			gbl_scanned_SSIDs = {}
-			sniff(iface=self.iface, prn = APScanHandler, store=0, timeout=3)
+			sniff(iface=self.iface, prn = self.APScanHandler, store=0, timeout=3)
 		except Exception as e:
 			print("scanap ERROR")
 			print(e)
 			pass
 
-def APScanHandler(pkt):
-	global gbl_scanned_SSIDs
-	if pkt.haslayer(Dot11):
-		if pkt.addr2 is not None:
-			if pkt.type == 0 and pkt.subtype == 8:
-				mac = pkt.addr2
-				ssid = (pkt.info).decode('ascii')
-				if mac not in gbl_scanned_SSIDs.keys():
-					gbl_scanned_SSIDs[mac] = {'ssid': ssid}
+	def APScanHandler(self, pkt):
+		global gbl_scanned_SSIDs
+		if pkt.haslayer(Dot11):
+			if pkt.addr2 is not None:
+				if pkt.type == 0 and pkt.subtype == 8:
+					mac = pkt.addr2
+					ssid = (pkt.info).decode('ascii')
+					if mac not in gbl_scanned_SSIDs.keys():
+						gbl_scanned_SSIDs[mac] = {'ssid': ssid}
 
-'''class beepThread(threading.Thread):
-	global gbl_targets, flg_hunt
-	def __init__(self, ssid):
-		threading.Thread.__init__(self)
+class BeepProcess(Process):
+	def __init__(self, ssid, gbl_targets):
+		super(BeepProcess, self).__init__()
+		print("BeepProcess init")
 		pygame.mixer.init()
 		pygame.mixer.music.load("beep2.wav")
 		self.sleepsec = 3
 		self.ssid = ssid
+		self.gbl_targets = gbl_targets
 		
 	def run(self):
-		while flg_hunt:
+		while True:
 			#threadLock.acquire()
-			print("Beeping...{}s,".format(self.sleepsec))
+			
 			try:
 				
 				signal = None
-				if gbl_targets[self.ssid]: 
+				if self.ssid in self.gbl_targets.keys():
+					#if self.gbl_targets[self.ssid]: 
 					signal = gbl_targets[self.ssid]['signal']
 					if signal in range(-35,0):
 						self.sleepsec = 0.05
@@ -144,40 +131,21 @@ def APScanHandler(pkt):
 					elif signal in range(-100,-96):
 						self.sleepsec = 3.50
 						
-					lastseen = gbl_targets[self.ssid]['lastseen']
+					lastseen = self.gbl_targets[self.ssid]['lastseen']
 					if (time.time() - lastseen <= 5):
-						pygame.mixer.music.play() 
+						print("BEEP!...then sleeping for {}s,".format(self.sleepsec))
+						pygame.mixer.music.play()
+					else:
+						print("Target went dark!")
+				else:
+					print("Haven't seen target yet.")
 							
 				#threadLock.release()
 			except Exception as e:
-				print("beepThread ERROR")
+				print("BeepProcess ERROR")
 				traceback.print_exc(file=sys.stdout)
 				pass
-			sleep(self.sleepsec)'''
-
-'''def PacketHandler(pkt):
-	global gbl_targets, tgt_ssid, flg_hunt
-	if flg_hunt is True:
-		raise KeyboardInterrupt
-	
-	if pkt.haslayer(Dot11):
-		print("PacketHandler: Packet received...")
-		if pkt.addr2 is not None:
-			if pkt.type == 0 and pkt.subtype == 8:
-				if (pkt.info).decode('ascii') == tgt_ssid:
-					try:
-						extra = pkt.notdecoded
-					except:
-						extra = None
-					
-					if extra != None:
-						sigstr = -(256-ord(extra[-2:-1]))
-					else:
-						sigstr = None 
-						print("No signal strength found!")
-					#prev_lastseen = gbl_targets.get(tgt_ssid,-99)
-					gbl_targets[tgt_ssid] = {'signal': sigstr, 'lastseen': time.time()}
-					print("WiFi signal strength: {}".format(sigstr))'''
+			sleep(self.sleepsec)
 
 def dbm2m(mhz, dbm):
 	m = 10 ** (( FSPL - (20 * log10(mhz)) + dbm ) / 20)
@@ -249,6 +217,7 @@ class MyServer(BaseHTTPRequestHandler):
 				print("STOPHUNT received")
 				if proc_hunt != None:
 					proc_hunt.terminate()
+					proc_beep.terminate()
 					print("Terminated hunt process")
 					proc_hunt = None
 				else:
@@ -267,19 +236,23 @@ class MyServer(BaseHTTPRequestHandler):
 
 def scanap():
 	iface = 'mon0'
-	thScan = scanapThread(iface)
+	thScan = ScanAPThread(iface)
 	thScan.start()
 	thScan.join()
 	return gbl_scanned_SSIDs
 
 
 def hunt(ssid=None, mac=None):
-	global tgt_ssid, proc_hunt
+	global tgt_ssid, proc_hunt, proc_beep, gbl_targets
 	tgt_ssid = ssid
 	iface = 'mon0'
-	proc_hunt = PacketSniffer(iface, ssid)
+	proc_hunt = PacketSniffer(iface, ssid, gbl_targets)
 	proc_hunt.daemon = True
 	proc_hunt.start()
+
+	proc_beep = BeepProcess(ssid, gbl_targets)
+	proc_beep.daemon = True
+	proc_beep.start()
 
 if __name__ == '__main__':
 	
