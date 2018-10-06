@@ -1,6 +1,6 @@
 from time import sleep
 from scapy.all import *
-import sys, threading, pygame, json, traceback, datetime
+import sys, threading, json, traceback, datetime, os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs
 from multiprocessing import Process, Manager
@@ -86,8 +86,12 @@ class BeepProcess(Process):
 	def __init__(self, ssid, gbl_targets):
 		super(BeepProcess, self).__init__()
 		print("BeepProcess init")
-		pygame.mixer.init()
+		'''pygame.mixer.init()
 		pygame.mixer.music.load("beep2.wav")
+		pygame.mixer.music.play()'''
+
+
+
 		self.sleepsec = 3
 		self.ssid = ssid
 		self.gbl_targets = gbl_targets
@@ -134,7 +138,8 @@ class BeepProcess(Process):
 					lastseen = self.gbl_targets[self.ssid]['lastseen']
 					if (time.time() - lastseen <= 5):
 						print("BEEP!...then sleeping for {}s,".format(self.sleepsec))
-						pygame.mixer.music.play()
+						#pygame.mixer.music.play()
+						os.system('aplay beep2.wav')
 					else:
 						print("Target went dark!")
 				else:
@@ -256,6 +261,10 @@ def hunt(ssid=None, mac=None):
 
 if __name__ == '__main__':
 	
+	'''pygame.mixer.init()
+	pygame.mixer.music.load("beep2.wav")
+	pygame.mixer.music.play()'''
+
 	myserver = HTTPServer(("", LISTENPORT), MyServer)
 	print("Serving at port {}...".format(LISTENPORT))
 	
