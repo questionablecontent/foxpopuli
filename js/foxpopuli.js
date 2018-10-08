@@ -114,6 +114,20 @@ $( document ).ready(function() {
 		  })
 	});
 
+	$( "#mon0" ).click( function( event ) {
+		$("#mon0").prop("disabled",true);
+		var jqxhr = $.get( "/", { action: "enablemon0"})
+		  .done(function(data) {
+		  	alert("mon0 enabled");
+		  })
+		  .fail(function(data) {
+		    alert( "Error when enabling mon0" );
+		  })
+		  .always(function() {
+		  	$("#mon0").prop("disabled",false);
+		  })
+	});
+
 });
 
 //Handler functions

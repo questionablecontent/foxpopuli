@@ -1,6 +1,6 @@
 from time import sleep
 from scapy.all import *
-import sys, threading, json, traceback, datetime, os
+import sys, threading, json, traceback, datetime, os, logging as log
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs
 from multiprocessing import Process, Manager
@@ -17,20 +17,22 @@ FSPL = 27.55 #Free-space path loss adapted average constant for home wifi router
 
 LISTENPORT = 80
 
+log.basicConfig(filename="/tmp/foxpopuli.log", level=log.DEBUG)
+
 class PacketSniffer(Process):
 	def __init__(self, iface, ssid, gbl_targets):
 		super(PacketSniffer, self).__init__()
-		print("PacketSniffer init")
+		log.debug("PacketSniffer init")
 		self.iface = iface
 		self.ssid = ssid
 		self.gbl_targets = gbl_targets
 
 	def run(self):
-		print("PacketSniffer run")
+		log.debug("PacketSniffer run")
 		try:
 			sniff(iface=self.iface, prn = self.PacketHandler, store=0)
 		except Exception as e:
-			print("scanThread ERROR")
+			log.debug("scanThread ERROR")
 			traceback.print_exc(file=sys.stdout)
 			pass
 		
@@ -51,10 +53,10 @@ class PacketSniffer(Process):
 							sigstr = -(256-ord(extra[-2:-1]))
 						else:
 							sigstr = None 
-							print("No signal strength found!")
+							log.debug("No signal strength found!")
 						#prev_lastseen = gbl_targets.get(tgt_ssid,-99)
 						self.gbl_targets[self.ssid] = {'signal': sigstr, 'lastseen': time.time()}
-						print("WiFi signal strength: {}dBm | Distance: {}m".format(sigstr, dbm2m(2400,abs(sigstr))))
+						log.debug("WiFi signal strength: {}dBm | Distance: {}m".format(sigstr, dbm2m(2400,abs(sigstr))))
 
 # Scan for all available APs
 class ScanAPThread(threading.Thread):
@@ -68,8 +70,8 @@ class ScanAPThread(threading.Thread):
 			gbl_scanned_SSIDs = {}
 			sniff(iface=self.iface, prn = self.APScanHandler, store=0, timeout=3)
 		except Exception as e:
-			print("scanap ERROR")
-			print(e)
+			log.debug("scanap ERROR")
+			log.debug(e)
 			pass
 
 	def APScanHandler(self, pkt):
@@ -85,7 +87,7 @@ class ScanAPThread(threading.Thread):
 class BeepProcess(Process):
 	def __init__(self, ssid, gbl_targets):
 		super(BeepProcess, self).__init__()
-		print("BeepProcess init")
+		log.debug("BeepProcess init")
 		'''pygame.mixer.init()
 		pygame.mixer.music.load("beep2.wav")
 		pygame.mixer.music.play()'''
@@ -137,17 +139,17 @@ class BeepProcess(Process):
 						
 					lastseen = self.gbl_targets[self.ssid]['lastseen']
 					if (time.time() - lastseen <= 5):
-						print("BEEP!...then sleeping for {}s,".format(self.sleepsec))
+						log.debug("BEEP!...then sleeping for {}s,".format(self.sleepsec))
 						#pygame.mixer.music.play()
 						os.system('aplay beep2.wav')
 					else:
-						print("Target went dark!")
+						log.debug("Target went dark!")
 				else:
-					print("Haven't seen target yet.")
+					log.debug("Haven't seen target yet.")
 							
 				#threadLock.release()
 			except Exception as e:
-				print("BeepProcess ERROR")
+				log.debug("BeepProcess ERROR")
 				traceback.print_exc(file=sys.stdout)
 				pass
 			sleep(self.sleepsec)
@@ -156,6 +158,10 @@ def dbm2m(mhz, dbm):
 	m = 10 ** (( FSPL - (20 * log10(mhz)) + dbm ) / 20)
 	m=round(m,2)
 	return m #Distance in meters
+
+def enableinterface(iface):
+	os.system('airmon-ng start {}'.format(iface))
+	return True
 
 class MyServer(BaseHTTPRequestHandler):
 	def do_HEAD(self):
@@ -166,7 +172,7 @@ class MyServer(BaseHTTPRequestHandler):
 	def do_GET(self):
 		global proc_hunt
 		reqPath = self.path
-		print("Requested path: {}".format(self.path))
+		log.debug("Requested path: {}".format(self.path))
 		
 		dct_params = parse_qs(reqPath[2:])
 		response = {}
@@ -174,7 +180,7 @@ class MyServer(BaseHTTPRequestHandler):
 		if reqPath == '/':
 			with open('index.html','r') as f:
 				data = f.read()
-			print("[+] sending index.html ({} bytes)...".format(len(data)))
+			log.debug("[+] sending index.html ({} bytes)...".format(len(data)))
 			self.wfile.write(bytes(data, 'utf=8'))
 		# If css or js, send all files available under the css or js sub directories
 		elif reqPath.startswith("/css/") or reqPath.startswith("/js/"):
@@ -183,7 +189,7 @@ class MyServer(BaseHTTPRequestHandler):
 				fname = 'css/' + '/'.join(tok[1:])
 				with open(fname,'r') as f:
 					data = f.read()
-				print("[+] sending /css/{} ({} bytes)...".format(tok[1], len(data)))
+				log.debug("[+] sending /css/{} ({} bytes)...".format(tok[1], len(data)))
 				self.wfile.write(bytes(data, 'utf=8'))
 			elif tok[0] == 'js':
 				fname = 'js/' + "/".join(tok[1:])
@@ -191,17 +197,17 @@ class MyServer(BaseHTTPRequestHandler):
 				if fname.endswith('.png') or fname.endswith('.gif'):
 					with open(fname,'rb') as f:
 						data = f.read()
-					print("[+] sending {} ({} bytes)...".format(fname, len(data)))
+					log.debug("[+] sending {} ({} bytes)...".format(fname, len(data)))
 					self.wfile.write(bytes(data))
 				else:
 					with open(fname,'r') as f:
 						data = f.read()
-					print("[+] sending {} ({} bytes)...".format(fname, len(data)))
+					log.debug("[+] sending {} ({} bytes)...".format(fname, len(data)))
 					self.wfile.write(bytes(data, 'utf=8'))
 		elif reqPath == '/favicon.ico':
 			with open('favicon.ico','rb') as f:
 				data = f.read()
-			print("[+] sending /favicon.ico ({} bytes)...".format(len(data)))
+			log.debug("[+] sending /favicon.ico ({} bytes)...".format(len(data)))
 			self.wfile.write(bytes(data))
 		elif action:
 			if action[0] == 'hunt':
@@ -214,25 +220,31 @@ class MyServer(BaseHTTPRequestHandler):
 				if ssid or mac:		
 					hunt(ssid, mac)
 					flg_hunt = True
-					print("Started hunting for SSID {}...".format(ssid))
+					log.debug("Started hunting for SSID {}...".format(ssid))
 					response = {'status':'SUCCESS', 'msg':'Successfully started hunting SSID {}'.format(ssid)}
 				else:
 					response = {'status':'FAIL', 'msg':'Unable start the hunt for SSID {}'.format(ssid)}
 			elif action[0] == 'stophunt':
-				print("STOPHUNT received")
+				log.debug("STOPHUNT received")
 				if proc_hunt != None:
 					proc_hunt.terminate()
 					proc_beep.terminate()
-					print("Terminated hunt process")
+					log.debug("Terminated hunt process")
 					proc_hunt = None
 				else:
-					print("Process was not hunting. Unable to terminate.")
+					log.debug("Process was not hunting. Unable to terminate.")
 			elif action[0] == 'scanap':
 				res = scanap()
 				if res:
 					response = {'status':'SUCCESS', 'msg':'AP Scan successful', 'data': res}
 				else:
 					response = {'status':'FAIL', 'msg':'Error when scanning for APs.'}
+			elif action[0] == 'enablemon0':
+				res = enableinterface('wlan1')
+				if res:
+					response = {'status':'SUCCESS', 'msg':'mon0 successfully enabled'}
+				else:
+					response = {'status':'FAIL', 'msg':'Error when enabling mon0'}
 			else:
 				response = {'status':'FAIL', 'msg':'{} is an unsupported action'.format(action)}
 		
@@ -266,7 +278,7 @@ if __name__ == '__main__':
 	pygame.mixer.music.play()'''
 
 	myserver = HTTPServer(("", LISTENPORT), MyServer)
-	print("Serving at port {}...".format(LISTENPORT))
+	log.debug("Serving at port {}...".format(LISTENPORT))
 	
 	try:
 		myserver.serve_forever()
@@ -274,6 +286,6 @@ if __name__ == '__main__':
 		pass
 	
 	myserver.server_close()
-	print("Stopped serving.")
+	log.debug("Stopped serving.")
 	
-	print('[+] done..')
+	log.debug('[+] done..')
