@@ -1,10 +1,10 @@
-from time import sleep
+
 import sys, json, traceback, datetime, os, logging as log
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs
 
 from foxutils import *
-from math import log10
+
 import netifaces
 
 #Globals
@@ -14,17 +14,12 @@ gbl_targets = gbl_manager.dict()
 tgt_ssid = None
 proc_hunt = None
 proc_beep = None
-FSPL = 27.55 #Free-space path loss adapted average constant for home wifi routers
+
 
 LISTENPORT = 80
 
 #log.basicConfig(filename="/tmp/foxpopuli.log", level=log.DEBUG)
 log.basicConfig(level=log.DEBUG)
-
-def dbm2m(mhz, dbm):
-	m = 10 ** (( FSPL - (20 * log10(mhz)) + dbm ) / 20)
-	m=round(m,2)
-	return m #Distance in meters
 
 def enableinterface(iface):
 	os.system('airmon-ng start {}'.format(iface))
@@ -112,7 +107,7 @@ class MyServer(BaseHTTPRequestHandler):
 					response = {'status':'SUCCESS', 'msg':'mon0 successfully enabled'}
 				else:
 					response = {'status':'FAIL', 'msg':'Error when enabling mon0'}
-			elif action[0] == 'getdevices':
+			elif action[0] == 'getinterfaces':
 				res = getInterfaces()
 				if res:
 					response = {'status':'SUCCESS', 'msg':'Interfaces successfully enumerated', 'data': res}
@@ -145,7 +140,7 @@ def hunt(ssid=None, mac=None):
 	proc_beep.daemon = True
 	proc_beep.start()
 
-def getDevices():
+def getInterfaces():
 	l_ifaces = netifaces.interfaces()
 	return l_ifaces
 

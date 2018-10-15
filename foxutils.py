@@ -139,3 +139,51 @@ class BeepProcess(Process):
 				traceback.print_exc(file=sys.stdout)
 				pass
 			sleep(self.sleepsec)
+
+
+class Interface():
+	#REGEX Patterns
+	REGEX_WIPHY = re.compile('wiphy (?P<wiphy>[0-9]{1,2})')
+	REGEX_INTERFACE = re.compile('Interface (?P<interface>.*)')
+	REGEX_IFINDEX = re.compile('ifindex (?P<ifindex>.*)')
+	REGEX_WDEV = re.compile('wdev (?P<wdev>.*)')
+	REGEX_ADDR = re.compile('addr (?P<addr>[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})')
+	REGEX_TYPE = re.compile('type (?P<type>.*)')
+
+	def __init__(self, name):
+		self.interface = name
+		self.addr = None
+		self.type = None
+		self.wiphy = None
+		self.wdev = None
+		self.ifindex = None
+
+		self.__update()
+
+	def __str__(self):
+		ret = "Interface: {iface}\n\tAddress: {addr}\n\tType: {type}\n\tPhy: {phy}\n\tWdev: {wdev}\n\tIfindex: {ifindex}".format(iface=self.interface, addr=self.addr, type=self.type, phy=self.wiphy, wdev=self.wdev, ifindex=self.ifindex)
+		return ret
+
+	def __update(self):
+		if self.interface:
+			try:
+				output = subprocess.check_output(['iw', 'dev', self.interface, 'info']).decode('utf-8')
+				self.wiphy = int(self.REGEX_WIPHY.findall(output)[0])
+				self.addr = self.REGEX_ADDR.findall(output)[0].lower()
+				self.type = self.REGEX_TYPE.findall(output)[0].lower()
+				self.wdev = self.REGEX_WDEV.findall(output)[0]
+				self.ifindex = int(self.REGEX_IFINDEX.findall(output)[0])
+			except:
+				log.error("iw dev info command returned error for interface name {}".format(self.interface))
+		else:
+			log.error("name field not set for this object")
+
+	def enable_monitor_mode(self):
+		try:
+			return False
+		except:
+			log.error("Error when enabling monitor mode on interface {}".format(self.interface))
+			return False
+
+	def disable_monitor_mode(self):
+		pass
