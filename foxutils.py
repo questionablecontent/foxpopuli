@@ -1,5 +1,5 @@
 from multiprocessing import Process, Manager
-import threading, logging as log
+import threading, logging as log, json
 from scapy.all import *
 from math import log10
 from time import sleep
@@ -177,6 +177,14 @@ class Interface():
 				log.error("iw dev info command returned error for interface name {}".format(self.interface))
 		else:
 			log.error("name field not set for this object")
+
+	def json(self):
+		ret = self.dict()
+		return json.dumps(ret)
+
+	def dict(self):
+		ret = {'interface':self.interface, 'addr':self.addr, 'type':self.type, 'wiphy':self.wiphy, 'wdev':self.wdev, 'ifindex':self.ifindex}
+		return ret		
 
 	def enable_monitor_mode(self):
 		try:

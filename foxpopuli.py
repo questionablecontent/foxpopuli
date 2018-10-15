@@ -9,8 +9,8 @@ import netifaces
 
 #Globals
 gbl_manager = Manager()
-gbl_scanned_SSIDs = {}
 gbl_targets = gbl_manager.dict()
+gbl_interfaces = {}
 tgt_ssid = None
 proc_hunt = None
 proc_beep = None
@@ -20,10 +20,6 @@ LISTENPORT = 80
 
 #log.basicConfig(filename="/tmp/foxpopuli.log", level=log.DEBUG)
 log.basicConfig(level=log.DEBUG)
-
-def enableinterface(iface):
-	os.system('airmon-ng start {}'.format(iface))
-	return True
 
 class MyServer(BaseHTTPRequestHandler):
 	def do_HEAD(self):
@@ -101,14 +97,8 @@ class MyServer(BaseHTTPRequestHandler):
 					response = {'status':'SUCCESS', 'msg':'AP Scan successful', 'data': res}
 				else:
 					response = {'status':'FAIL', 'msg':'Error when scanning for APs.'}
-			elif action[0] == 'enablemon0':
-				res = enableinterface('wlan1')
-				if res:
-					response = {'status':'SUCCESS', 'msg':'mon0 successfully enabled'}
-				else:
-					response = {'status':'FAIL', 'msg':'Error when enabling mon0'}
 			elif action[0] == 'getinterfaces':
-				res = getInterfaces()
+				res = get_interfaces()
 				if res:
 					response = {'status':'SUCCESS', 'msg':'Interfaces successfully enumerated', 'data': res}
 				else:
@@ -140,9 +130,16 @@ def hunt(ssid=None, mac=None):
 	proc_beep.daemon = True
 	proc_beep.start()
 
-def getInterfaces():
-	l_ifaces = netifaces.interfaces()
-	return l_ifaces
+def get_interfaces():
+	global gbl_interfaces
+	ret = netifaces.interfaces()
+	gbl_interfaces = []
+	lst_ret_ifaces = []
+	for iface in ret:
+		i = Interface(iface)
+		gbl_interfaces.append(i)
+		lst_ret_ifaces.append(i.dict())
+	return lst_ret_ifaces
 
 if __name__ == '__main__':	
 
