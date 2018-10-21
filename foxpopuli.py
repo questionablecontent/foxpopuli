@@ -103,11 +103,39 @@ class MyServer(BaseHTTPRequestHandler):
 					response = {'status':'SUCCESS', 'msg':'Interfaces successfully enumerated', 'data': res}
 				else:
 					response = {'status':'FAIL', 'msg':'Error when enumerating interfaces'}
+			elif action[0] == 'enablemonitormode':
+				iface = dct_params.get('interface',None)
+				if iface:
+					ret, msg = enable_monitor_mode(iface[0])
+					if ret:
+						response = {'status':'SUCCESS', 'msg':'Monitor mode successfully enabled for interfaces {}. {}'.format(iface, msg)}
+					else:
+						response = {'status':'FAIL', 'msg': 'Unable to enable monitor mode for interface {}. {}'.format(iface, msg)}
+				else:
+					response = {'status':'FAIL', 'msg':'A valid interface name is required to enable monitor mode.'}
+			elif action[0] == 'disablemonitormode':
+				iface = dct_params.get('interface',None)
+				if iface:
+					ret, msg = disable_monitor_mode(iface[0])
+					if ret:
+						response = {'status':'SUCCESS', 'msg':'Monitor mode successfully disabled for interfaces {}. {}'.format(iface, msg)}
+					else:
+						response = {'status':'FAIL', 'msg': 'Unable to disable monitor mode for interface {}. {}'.format(iface, msg)}
+				else:
+					response = {'status':'FAIL', 'msg':'A valid interface name is required to disable monitor mode.'}
 			else:
 				response = {'status':'FAIL', 'msg':'{} is an unsupported action'.format(action)}
 		
 			response = json.dumps(response)
 			self.wfile.write(bytes(response, 'utf-8'))
+
+#Internal functions
+def __get_interface_byName(iface):
+	for itm in gbl_interfaces:
+		if itm.interface.lower() == iface.lower():
+			log.debug(itm)
+			return itm
+	return None
 
 def scanap():
 	iface = 'mon0'
@@ -140,6 +168,26 @@ def get_interfaces():
 		gbl_interfaces.append(i)
 		lst_ret_ifaces.append(i.dict())
 	return lst_ret_ifaces
+
+def enable_monitor_mode(iface):
+	if iface:
+		itm = __get_interface_byName(iface)
+		if itm:
+			return itm.enable_monitor_mode()
+		else:
+			return False, "No interface {} was found".format(iface)
+	else:
+		return False, "No interface name was provided"
+
+def disable_monitor_mode(iface):
+	if iface:
+		itm = __get_interface_byName(iface)
+		if itm:
+			return itm.disable_monitor_mode()
+		else:
+			return False, "No interface {} was found".format(iface)
+	else:
+		return False, "No interface name was provided"
 
 if __name__ == '__main__':	
 

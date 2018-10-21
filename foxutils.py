@@ -150,6 +150,10 @@ class Interface():
 	REGEX_ADDR = re.compile('addr (?P<addr>[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})')
 	REGEX_TYPE = re.compile('type (?P<type>.*)')
 
+	TYPE_MONITOR = "monitor"
+	TYPE_AP = "ap"
+	TYPE_MANAGED = "managed"
+
 	def __init__(self, name):
 		self.interface = name
 		self.addr = None
@@ -187,11 +191,25 @@ class Interface():
 		return ret		
 
 	def enable_monitor_mode(self):
-		try:
-			return False
-		except:
-			log.error("Error when enabling monitor mode on interface {}".format(self.interface))
-			return False
+		if self.type == self.TYPE_MANAGED:
+			try:
+				output = subprocess.check_output(['airmon-ng', 'start', self.interface])
+				# TODO: Check for output to see if error was thrown
+				return True, "Successfully enabled Monitor mode for interface {}.".format(self.interface)
+			except:
+				log.error("Error when enabling monitor mode on interface {}".format(self.interface))
+				return False, "Error when enabling monitor mode on interface {}".format(self.interface)
+		else:
+			return False, "Interface {} is not in MANAGED mode.".format(self.interface)
 
 	def disable_monitor_mode(self):
-		pass
+		if self.type == self.TYPE_MONITOR:
+			try:
+				output = subprocess.check_output(['airmon-ng', 'stop', self.interface])
+				# TODO: Check for output to see if error was thrown
+				return True, "Successfully disabled Monitor mode for interface {}.".format(self.interface)
+			except:
+				log.error("Error when disabling monitor mode on interface {}".format(self.interface))
+				return False, "Error when disabling monitor mode on interface {}".format(self.interface)
+		else:
+			return False, "Interface {} is not in MONITOR mode.".format(self.interface)
