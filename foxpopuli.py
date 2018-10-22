@@ -133,7 +133,6 @@ class MyServer(BaseHTTPRequestHandler):
 def __get_interface_byName(iface):
 	for itm in gbl_interfaces:
 		if itm.interface.lower() == iface.lower():
-			log.debug(itm)
 			return itm
 	return None
 
