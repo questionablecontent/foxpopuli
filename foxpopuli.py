@@ -92,7 +92,8 @@ class MyServer(BaseHTTPRequestHandler):
 				else:
 					log.debug("Process was not hunting. Unable to terminate.")
 			elif action[0] == 'scanap':
-				res = scanap()
+				iface = dct_params.get('interface',None)
+				res = scanap(iface)
 				if res:
 					response = {'status':'SUCCESS', 'msg':'AP Scan successful', 'data': res}
 				else:
@@ -123,6 +124,12 @@ class MyServer(BaseHTTPRequestHandler):
 						response = {'status':'FAIL', 'msg': 'Unable to disable monitor mode for interface {}. {}'.format(iface, msg)}
 				else:
 					response = {'status':'FAIL', 'msg':'A valid interface name is required to disable monitor mode.'}
+			elif action[0] == 'getmonitorinterfaces':
+				ret = get_monitor_mode_interfaces()
+				if ret:
+					response = {'status':'SUCCESS', 'msg':'{} monitor mode interface(s) successfully returned'.format(len(ret)), 'data':ret}
+				else:
+					response = {'status':'FAIL', 'msg': 'Unable to retrieve monitor mode interfaces.'}
 			else:
 				response = {'status':'FAIL', 'msg':'{} is an unsupported action'.format(action)}
 		
@@ -136,8 +143,17 @@ def __get_interface_byName(iface):
 			return itm
 	return None
 
-def scanap():
-	iface = 'mon0'
+
+def get_monitor_mode_interfaces():
+	ret = []
+	for itm in gbl_interfaces:
+		if (itm.type == Interface.TYPE_MONITOR):
+			ret.append(itm.interface)
+	return ret
+
+def scanap(iface):
+	if (not iface):
+		iface = 'mon0'
 	scanned_SSIDs = {}
 	thScan = ScanAPThread(iface, scanned_SSIDs)
 	thScan.start()

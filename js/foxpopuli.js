@@ -32,7 +32,7 @@ $( document ).ready(function() {
     	$btnscanap_load.show();
     	$span_scanap_load_msg.text("scanning...");
     	$span_scanap_load_msg.show();
-    	var jqxhr = $.get( "/", { action: "scanap"})
+    	var jqxhr = $.get( "/", { action: "scanap", interface:$('#ifacelist').val()})
 		  .done(function(data) {
 		  	// Clear tbl_aplist, add headers
 		  	$tbl_aplist.empty();
@@ -101,6 +101,21 @@ $( document ).ready(function() {
     			newrow = $("<tr><td>"+btn_toggle+"</td><td>"+iface['interface']+"</td><td>" + iface['wiphy'] + "</td><td>" + iface['type'] + "</td></tr>");
 				newrow.appendTo($tbl_interfaces);
 			});
+
+		  	// Populate ifacelist select
+		  	var jqxhr2 = $.get( "/", { action: "getmonitorinterfaces"})
+		  		.done(function(data) {
+		  			$('#ifacelist').empty();
+		  			var data = $.parseJSON(data);
+		  			var msg = data.msg;
+		  			var status = data.status;
+		  			console.log(msg);
+		  			mmifaces = data.data;
+		  			$.each(mmifaces, function(index, iface) {
+		  				$('#ifacelist').append(new Option(iface,iface));
+		  			});
+		  		})
+
 		  })
 		  .fail(function(data) {
 		    alert( "Error when refreshing interface list" );
