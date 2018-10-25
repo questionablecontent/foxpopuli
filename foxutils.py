@@ -13,11 +13,12 @@ def dbm2m(mhz, dbm):
 	return m #Distance in meters
 
 class PacketSnifferProcess(Process):
-	def __init__(self, iface, ssid, gbl_targets):
+	def __init__(self, iface, ssid, mac, gbl_targets):
 		super(PacketSnifferProcess, self).__init__()
 		log.debug("PacketSniffer init")
 		self.iface = iface
 		self.ssid = ssid
+		self.mac = mac
 		self.gbl_targets = gbl_targets
 
 	def run(self):
@@ -153,6 +154,8 @@ class Interface():
 	TYPE_MONITOR = "monitor"
 	TYPE_AP = "ap"
 	TYPE_MANAGED = "managed"
+
+	FILTER_INTERFACES = ['lo', 'eth0']
 
 	def __init__(self, name):
 		self.interface = name

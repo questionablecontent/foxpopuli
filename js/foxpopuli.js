@@ -17,15 +17,14 @@ $( document ).ready(function() {
       heightStyle: "content"
     });
 
-    
+    //Button click handlers
+    $("#stoptrackap").prop("disabled",true);
 
-    //Scan APs
+    // Scan APs Start
+
     var $btnscanap_load = $("#scanap_load").hide();
     var $span_scanap_load_msg = $("#scanap_load_msg");
     var $tbl_aplist = $("#tbl_aplist");
-
-    //Button click handlers
-    $("#stoptrackap").prop("disabled",true);
 
     $( "#scanap" ).click( function( event ) {
     	$("#scanap").prop("disabled",true);
@@ -36,7 +35,7 @@ $( document ).ready(function() {
 		  .done(function(data) {
 		  	// Clear tbl_aplist, add headers
 		  	$tbl_aplist.empty();
-		  	var newrow = $("<tr><th>&nbsp;</th><th>Interface</th><thPhysical Device No.</th></tr>");
+		  	var newrow = $("<tr><th>&nbsp;</th><th>&nbsp;</th><th>BSSID/MAC</th><th>SSID</th></tr>");
 		  	newrow.appendTo($tbl_aplist);
 
 		  	var data = $.parseJSON(data);
@@ -47,8 +46,9 @@ $( document ).ready(function() {
 		  	macs = Object.keys(data)
 		  	$.each(macs, function(index, mac) {
 		  		var btn_send = '<button id="btn_track" class="ui-button ui-widget ui-corner-all" mac="'+mac+'" ssid="'+data[mac].ssid+'">Send</button>';
-    			var btn_details = '<button id="btn_details" class="ui-button ui-widget ui-corner-all" mac="'+mac+'" ssid="'+data[mac].ssid+'">View</button>';
-    			
+    			//var btn_details = '<button id="btn_details" class="ui-button ui-widget ui-corner-all" mac="'+mac+'" ssid="'+data[mac].ssid+'">View</button>';
+    			var btn_details = "&nbsp;"
+
     			newrow = $("<tr><td>"+btn_details+"</td><td>"+btn_send+"</td><td>" + mac + "</td><td>" + data[mac].ssid + "</td></tr>");
 				newrow.appendTo($tbl_aplist);
 			});
@@ -63,6 +63,17 @@ $( document ).ready(function() {
 		  	$("#scanap").prop("disabled",false);
 		  })
 	});
+
+	$tbl_aplist.on('click', '#btn_track', function() {
+    	var mac = $(this).attr("mac");
+		var ssid = $(this).attr("ssid");
+
+		$('#txt_track_mac').val(mac);
+		$('#txt_track_ssid').val(ssid);
+
+		$('#accordion').accordion('option','active',2);
+	});
+	//Scan APs End
 
 	//Interfaces Start
     var $btn_scaninterfaces_load = $("#scaninterfaces_load").hide();
@@ -157,16 +168,28 @@ $( document ).ready(function() {
 
 	// Interfaces End
 
-	$tbl_aplist.on('click', '#btn_track', function() {
-    	var mac = $(this).attr("mac");
-		var ssid = $(this).attr("ssid");
+	
 
-		$('#txt_track_mac').val(mac);
-		$('#txt_track_ssid').val(ssid);
+	// Track AP Start
+	var hunt_status_timer = $.timer(get_hunt_status, 1000);
 
-		$('#accordion').accordion('option','active',1);
-	});
-
+	function get_hunt_status() { 
+		var jqxhr = $.get( "/", { action: "gethuntstatus"})
+		  .done(function(data) {
+		  	var data = $.parseJSON(data);
+  			var msg = data.msg;
+  			var status = data.status;
+  			//console.log(msg);
+  			data = data.data;
+		  	var sigstr = data.signal_strength;
+		  	var dist = data.distance;
+		  	$('#hunt_status').html('Distance: <strong>' + dist + '</strong> Signal Strength: <strong>' + sigstr + '</strong>');
+		  })
+		  .fail(function(data) {
+		  	$('#hunt_status').html('Hunt abruptly stopped');
+		    hunt_status_timer.stop();
+		  })
+	};
 
 	$( "#cleartrackap" ).click( function(event) {
 		$('#txt_track_mac').val("");
@@ -179,9 +202,12 @@ $( document ).ready(function() {
 		$("#stoptrackap").prop("disabled",false);
 		var ssid = $('#txt_track_ssid').val();
 		var mac = $('#txt_track_mac').val();
-		var jqxhr = $.get( "/", { action: "hunt", mac: mac, ssid: ssid})
+		var iface = $('#ifacelist').val();
+		var jqxhr = $.get( "/", { action: "hunt", mac: mac, ssid: ssid, interface: iface})
 		  .done(function(data) {
 		  	alert("hunting");
+		  	hunt_status_timer.play();
+		  	$('#accordion').accordion('option','active',3);
 		  })
 		  .fail(function(data) {
 		    alert( "Error when hunting for AP" );
@@ -194,16 +220,17 @@ $( document ).ready(function() {
 	$( "#stoptrackap" ).click( function( event ) {
 		var jqxhr = $.get( "/", { action: "stophunt"})
 		  .done(function(data) {
-		  	alert("stopped")
+		  	alert("stopped");
 		  })
 		  .fail(function(data) {
 		    alert( "Error when stopping the hunt for AP" );
 		  })
 		  .always(function() {
 		  	$("#trackap").prop("disabled",false);
+		  	hunt_status_timer.stop();
 		  })
 	});
-
+	//Track AP End
 
 
 

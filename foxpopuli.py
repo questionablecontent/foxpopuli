@@ -12,6 +12,7 @@ gbl_manager = Manager()
 gbl_targets = gbl_manager.dict()
 gbl_interfaces = {}
 tgt_ssid = None
+tgt_mac = None
 proc_hunt = None
 proc_beep = None
 
@@ -71,12 +72,14 @@ class MyServer(BaseHTTPRequestHandler):
 			if action[0] == 'hunt':
 				ssid = dct_params.get('ssid',None)
 				mac = dct_params.get('mac',None)
+				iface = dct_params.get('interface',None)
+				
 				if ssid:
 					ssid = ssid[0]
 				if mac:
 					mac = mac[0]
 				if ssid or mac:		
-					hunt(ssid, mac)
+					hunt(ssid, mac, iface)
 					flg_hunt = True
 					log.debug("Started hunting for SSID {}...".format(ssid))
 					response = {'status':'SUCCESS', 'msg':'Successfully started hunting SSID {}'.format(ssid)}
@@ -130,6 +133,14 @@ class MyServer(BaseHTTPRequestHandler):
 					response = {'status':'SUCCESS', 'msg':'{} monitor mode interface(s) successfully returned'.format(len(ret)), 'data':ret}
 				else:
 					response = {'status':'FAIL', 'msg': 'Unable to retrieve monitor mode interfaces.'}
+			elif action[0] == 'gethuntstatus':
+				if proc_hunt != None:
+					sigstr = gbl_targets[tgt_ssid]['signal']
+					distance = dbm2m(2400,abs(sigstr))
+					data = {'signal_strength':'{}dBm'.format(sigstr), 'distance':'{}m'.format(distance)}
+					response = {'status':'SUCCESS', 'msg':'Status retrieved', 'data':data}
+				else:
+					response = {'status':'FAIL', 'msg':'No hunt in progress.'}
 			else:
 				response = {'status':'FAIL', 'msg':'{} is an unsupported action'.format(action)}
 		
@@ -161,11 +172,13 @@ def scanap(iface):
 	return scanned_SSIDs
 
 
-def hunt(ssid=None, mac=None):
+def hunt(ssid=None, mac=None, iface=None):
 	global tgt_ssid, proc_hunt, proc_beep, gbl_targets
 	tgt_ssid = ssid
-	iface = 'mon0'
-	proc_hunt = PacketSnifferProcess(iface, ssid, gbl_targets)
+	tgt_mac = mac
+	if (not iface):
+		iface = 'mon0'
+	proc_hunt = PacketSnifferProcess(iface, ssid, mac, gbl_targets)
 	proc_hunt.daemon = True
 	proc_hunt.start()
 
@@ -179,9 +192,10 @@ def get_interfaces():
 	gbl_interfaces = []
 	lst_ret_ifaces = []
 	for iface in ret:
-		i = Interface(iface)
-		gbl_interfaces.append(i)
-		lst_ret_ifaces.append(i.dict())
+		if iface not in Interface.FILTER_INTERFACES:
+			i = Interface(iface)
+			gbl_interfaces.append(i)
+			lst_ret_ifaces.append(i.dict())
 	return lst_ret_ifaces
 
 def enable_monitor_mode(iface):

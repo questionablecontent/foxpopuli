@@ -6,6 +6,7 @@
 <link rel="stylesheet" href="css/foxpopuli.css">
 <script type="text/javascript" src="js/jquery.js"></script>
 <script type="text/javascript" src="js/jquery-ui.min.js"></script>
+<script type="text/javascript" src="js/jquery.timer.js"></script>
 <script type="text/javascript" src="js/foxpopuli.js"></script>
 <body>
 	<!--button type="button" id='btnTest'>Test</button><br/>
@@ -15,24 +16,28 @@
 
 	<div id="logo"></div>
   <div id="accordion">
-      <h3>Interfaces</h3>
+      <h3>Configure Interfaces</h3>
       <div>
         <button id="scaninterfaces" class="ui-button ui-widget ui-corner-all">Refresh interfaces</button>&nbsp;<span id='scaninterfaces_load'><img src='js/images/loader.gif'></span>&nbsp;<span id='scaninterfaces_load_msg'></span><br/>
         <table id='tbl_interfaces'>
         </table>
       </div>
-      <h3>Scan</h3>
+      <h3>Scan for APs</h3>
   		<div>
         <select id='ifacelist'></select>
     		<button id="scanap" class="ui-button ui-widget ui-corner-all">Scan</button>&nbsp;<span id='scanap_load'><img src='js/images/loader.gif'></span>&nbsp;<span id='scanap_load_msg'></span><br/>
     		<table id='tbl_aplist'>
         </table>
   		</div>
-  		<h3>Track</h3>
+  		<h3>Start Tracking</h3>
   		<div>
-    		MAC: <input type="text" id="txt_track_mac">&nbsp;or&nbsp;SSID: <input type="text" id="txt_track_ssid">&nbsp;<button id="cleartrackap" class="ui-button ui-widget ui-corner-all">Clear</button><br/>
-        <button id="trackap" class="ui-button ui-widget ui-corner-all">Track</button>&nbsp;<button id="stoptrackap" class="ui-button ui-widget ui-corner-all">Stops</button>
+    		BSSID/MAC: <input type="text" id="txt_track_mac"> SSID: <input type="text" id="txt_track_ssid"><br/>
+        <button id="cleartrackap" class="ui-button ui-widget ui-corner-all">Clear</button>&nbsp;<button id="trackap" class="ui-button ui-widget ui-corner-all">Track</button>&nbsp;<button id="stoptrackap" class="ui-button ui-widget ui-corner-all">Stops</button>
   		</div>
+      <h3>Hunt</h3>
+      <div>
+        <span id='hunt_status'></span>
+      </div>
   	</div>
 </body>
 </html>
