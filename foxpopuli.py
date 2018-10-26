@@ -137,7 +137,8 @@ class MyServer(BaseHTTPRequestHandler):
 				if proc_hunt != None:
 					sigstr = gbl_targets[tgt_ssid]['signal']
 					distance = dbm2m(2400,abs(sigstr))
-					data = {'signal_strength':'{}dBm'.format(sigstr), 'distance':'{}m'.format(distance)}
+					dist_ft = m2ft(distance)
+					data = {'signal_strength':'{}dBm'.format(sigstr), 'distance':'{}m ({}ft)'.format(distance, dist_ft)}
 					response = {'status':'SUCCESS', 'msg':'Status retrieved', 'data':data}
 				else:
 					response = {'status':'FAIL', 'msg':'No hunt in progress.'}

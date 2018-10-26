@@ -12,6 +12,9 @@ def dbm2m(mhz, dbm):
 	m=round(m,2)
 	return m #Distance in meters
 
+def m2ft(m):
+	return ("{:.2f}".format(m*3.281))
+
 class PacketSnifferProcess(Process):
 	def __init__(self, iface, ssid, mac, gbl_targets):
 		super(PacketSnifferProcess, self).__init__()
@@ -128,7 +131,8 @@ class BeepProcess(Process):
 					lastseen = self.gbl_targets[self.ssid]['lastseen']
 					if (time.time() - lastseen <= 5):
 						log.debug("BEEP!...then sleeping for {}s,".format(self.sleepsec))
-						os.system('aplay beep2.wav')
+						#os.system('aplay beep2.wav')
+						output = subprocess.check_output(['aplay', 'beep2.wav'])
 					else:
 						log.debug("Target went dark!")
 				else:
