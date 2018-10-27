@@ -135,7 +135,7 @@ class MyServer(BaseHTTPRequestHandler):
 					response = {'status':'FAIL', 'msg': 'Unable to retrieve monitor mode interfaces.'}
 			elif action[0] == 'gethuntstatus':
 				if proc_hunt != None:
-					sigstr = gbl_targets[tgt_ssid]['signal']
+					sigstr = gbl_targets[0]['signal']
 					distance = dbm2m(2400,abs(sigstr))
 					dist_ft = m2ft(distance)
 					data = {'signal_strength':'{}dBm'.format(sigstr), 'distance':'{}m ({}ft)'.format(distance, dist_ft)}

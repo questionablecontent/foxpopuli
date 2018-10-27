@@ -34,13 +34,22 @@ class PacketSnifferProcess(Process):
 			pass
 		
 	def PacketHandler(self, pkt):
-
+		#ssid       = p[Dot11Elt].info
+        #bssid      = p[Dot11].addr3    
+        #channel    = int( ord(p[Dot11Elt:3].info))
 		if pkt.haslayer(Dot11):
 			#print("PacketHandler: Packet received...")
 			if pkt.addr2 is not None:
 				if pkt.type == 0 and pkt.subtype == 8:
 					#print("pkt:{} | stored:{}".format((pkt.info).decode('ascii'), self.ssid))
-					if (pkt.info).decode('ascii') == self.ssid:
+					#Which one should we use (ssid or bssid)?
+					if ((pkt.info).decode('ascii') == self.ssid) or (pkt.addr3 == self.mac):
+						if (self.mac == None) and (pkt.addr3) and (len(pkt.addr3) > 0):
+							self.mac = pkt.addr3
+
+						if (self.ssid == None) and (len((pkt.info).decode('ascii')) > 0):
+							self.ssid = (pkt.info).decode('ascii')
+						
 						try:
 							extra = pkt.notdecoded
 						except:
@@ -52,7 +61,7 @@ class PacketSnifferProcess(Process):
 							sigstr = None 
 							log.debug("No signal strength found!")
 						#prev_lastseen = gbl_targets.get(tgt_ssid,-99)
-						self.gbl_targets[self.ssid] = {'signal': sigstr, 'lastseen': time.time()}
+						self.gbl_targets[0] = {'signal': sigstr, 'lastseen': time.time()}
 						log.debug("WiFi signal strength: {}dBm | Distance: {}m".format(sigstr, dbm2m(2400,abs(sigstr))))
 
 
@@ -98,7 +107,7 @@ class BeepProcess(Process):
 				signal = None
 				if self.ssid in self.gbl_targets.keys():
 					#if self.gbl_targets[self.ssid]: 
-					signal = self.gbl_targets[self.ssid]['signal']
+					signal = self.gbl_targets[0]['signal']
 					if signal in range(-35,0):
 						self.sleepsec = 0.05
 					elif signal in range(-40,-36):
@@ -128,7 +137,7 @@ class BeepProcess(Process):
 					elif signal in range(-100,-96):
 						self.sleepsec = 3.50
 						
-					lastseen = self.gbl_targets[self.ssid]['lastseen']
+					lastseen = self.gbl_targets[0]['lastseen']
 					if (time.time() - lastseen <= 5):
 						log.debug("BEEP!...then sleeping for {}s,".format(self.sleepsec))
 						#os.system('aplay beep2.wav')
